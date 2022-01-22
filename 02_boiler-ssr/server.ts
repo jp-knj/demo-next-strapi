@@ -5,11 +5,15 @@ import express from 'express'
 import { createServer as createViteServer } from 'vite'
 
 
-async function createServer() {
+const createServer = async () => {
     const app = express()
 
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
+
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const resolve = (url: string) => path.resolve(__dirname, url);
 
     // ミドルウェアモードで Vite サーバを作成します。これにより、Vite 自体のHTMLが無効になります。
     // ロジックを提供し、親サーバに制御を任せます。
@@ -17,19 +21,26 @@ async function createServer() {
     // ミドルウェアモードで、Vite 自体の HTML 配信ロジックを使用したい場合は、
     // `middlewareMode` として 'html' を使用します(参照 https://ja.vitejs.dev/config/#server-middlewaremode)
     const vite = await createViteServer({
-        server: { middlewareMode: 'ssr' }
+        server: {
+            middlewareMode: 'ssr',
+            // テスト中にファイルを頻繁に編集すると、chokidar が変更イベントを見落とすことがあるため、一貫性を保つためにポーリングを行う。
+            watch: {
+                usePolling: true,
+                interval: 100,
+            },
+        },
     })
+
     // Vite の接続インスタンスをミドルウェアとして使用します。
     app.use(vite.middlewares)
 
-    app.use('*', async (req, res) => {
-        const url = req.originalUrl
+    app.use('*', async ({originalUrl}, res) => {
         try {
-            const __filename = fileURLToPath(import.meta.url);
-            const __dirname = path.dirname(__filename);
+            const url = originalUrl
+
             // 1. index.html を読み込む
             let template = fs.readFileSync(
-                path.resolve(__dirname, 'index.html'),
+                resolve('index.html'),
                 'utf-8'
             )
 
@@ -41,7 +52,9 @@ async function createServer() {
             // 3. サーバサイドのエントリポイントを読み込みます。 vite.ssrLoadModule は自動的に
             //    ESM を Node.js で使用できるコードに変換します! ここではバンドルは必要ありません
             //    さらに HMR と同様に効率的な無効化を提供します。
-            const { render } = await vite.ssrLoadModule('/src/entry-server.tsx')
+            // const { render } = await vite.ssrLoadModule('/src/entry-server.tsx')
+
+            let render = (await vite.ssrLoadModule("/src/client/entry-server.tsx")).render;
 
             // 4. アプリケーションで HTML をレンダリングします。これは entry-server.js からエクスポートされた `render` を使用しています。
             //    関数は適切なフレームワーク SSR API を呼び出します。
@@ -62,9 +75,10 @@ async function createServer() {
         }
 
     })
-
-    console.log('Hello World')
-    app.listen(3000)
+    const port = process.env.PORT || 1234
+    app.listen(Number(port), "0.0.0.0", () => {
+        console.log(`App is listening on port ${port}`);
+    });
 }
 
 createServer()
