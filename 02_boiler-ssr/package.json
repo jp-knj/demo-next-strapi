@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node server.ts",
+    "dev": " node --loader ts-node/esm server.ts",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
