@@ -1,5 +1,12 @@
-node_modules
-.DS_Store
 dist
 dist-ssr
 *.local
+
+# OS metadata
+.DS_Store
+
+# Dependency directory
+node_modules
+
+# Editor
+.idea
